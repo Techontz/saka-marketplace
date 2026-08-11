@@ -127,3 +127,14 @@ htmlcov/
 # OS / tooling
 # ------------------------------------------------------------
 Thumbs.db
+
+# ------------------------------------------------------------
+# Database dumps
+# ------------------------------------------------------------
+# A dump is production DATA, not source. backend/saka_production_import.sql
+# showed up untracked carrying INSERTs for users and personal_access_tokens —
+# one `git add -A` at the repo root away from publishing password hashes and
+# live API tokens to GitHub.
+*.sql
+*.sql.gz
+*.dump

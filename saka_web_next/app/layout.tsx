@@ -1,25 +1,26 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
-import { ADSENSE_CLIENT, ADSENSE_ENABLED, SITE_URL } from "@/lib/config";
-import { AuthDialogProvider } from "@/providers/AuthDialogProvider";
-import { AuthProvider } from "@/providers/AuthProvider";
-import { FavoritesProvider } from "@/providers/FavoritesProvider";
-import { LocationProvider } from "@/providers/LocationProvider";
-import { LocationWelcome } from "@/components/location/LocationWelcome";
-import { QueryProvider } from "@/providers/QueryProvider";
+import { SITE_URL } from "@/lib/config";
 
 import "./globals.css";
 
 /**
- * The shell, ported from the original `__root.tsx`.
+ * The document, and nothing else.
  *
- * Same chrome, same order, same `pt-20` under a fixed 80px header. The fonts
- * are still Urbanist from Google Fonts, preconnected exactly as before.
+ * Three applications share this file — the marketplace at `/`, the vendor
+ * portal at `/vendor` and the admin portal at `/admin` — so it holds only what
+ * all three genuinely share: the html element, the stylesheet and the font.
+ * Chrome belongs to whichever shell is below it.
+ *
+ * The marketplace header and footer used to live here, back when this was the
+ * only app in the project. They now sit in `(marketplace)/layout.tsx`; leaving
+ * them here would have painted the storefront's navigation across both portals.
+ *
+ * Urbanist is loaded here rather than per-area because the portals use it too,
+ * and a second copy fetched under `/vendor` would be a second network request
+ * for a font the browser already has.
  */
-
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -64,52 +65,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&display=swap"
         />
-
-        {/*
-          * Google AdSense, loaded ONLY when a publisher id is configured.
-          *
-          * A plain <script async>, not next/script: this has to be in <head>
-          * with the crossOrigin attribute AdSense requires, and it must be
-          * absent entirely — not merely inert — when ads are off. A deployment
-          * with no id emits no tag, makes no request to Google, and keeps the
-          * narrower CSP (see next.config.ts).
-          *
-          * `async` rather than `defer`: the units below the fold are not
-          * render-blocking either way, and AdSense's own guidance is async.
-          */}
-        {ADSENSE_ENABLED && (
-          <script
-            async
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
-            crossOrigin="anonymous"
-          />
-        )}
       </head>
-      <body>
-        <QueryProvider>
-          <AuthProvider>
-            <FavoritesProvider>
-              <AuthDialogProvider>
-                {/*
-                  LocationProvider sits INSIDE the auth chain but outside the
-                  page, because "where am I browsing from" outlives any single
-                  route and the header's location chip reads it too.
-                */}
-                <LocationProvider>
-                  <div className="flex min-h-screen flex-col bg-page">
-                    <Header />
-                    <main className="flex-1 pt-20">{children}</main>
-                    <Footer />
-                  </div>
-
-                  {/* Renders nothing once a choice has been recorded. */}
-                  <LocationWelcome />
-                </LocationProvider>
-              </AuthDialogProvider>
-            </FavoritesProvider>
-          </AuthProvider>
-        </QueryProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

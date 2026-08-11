@@ -155,7 +155,51 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      /*
+       * The admin portal keeps its own, stricter Permissions-Policy.
+       *
+       * It shipped as a separate origin that denied geolocation outright —
+       * "nothing in the admin portal needs it". Folding three apps onto one
+       * domain would have quietly handed it the marketplace's `geolocation=
+       * (self)`, so the denial is restated here as a per-path rule. Listed
+       * AFTER the catch-all: for the same header on a matching path, the later
+       * entry wins.
+       *
+       * The vendor portal is deliberately NOT in this list. It asks for
+       * location when a vendor drops a map pin on their business during
+       * onboarding, so it needs the storefront's policy.
+       */
+      {
+        source: "/admin/:path*",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), payment=(), geolocation=()",
+          },
+        ],
+      },
     ];
+  },
+
+  /*
+   * Pin the workspace root.
+   *
+   * Turbopack infers a monorepo root by walking UP from the project looking for
+   * lockfiles. There is a stray, empty `package-lock.json` in the user's home
+   * directory, so it infers `/Users/<user>` as the root and says so on every
+   * build.
+   *
+   * That is not cosmetic. The inferred root is what Turbopack watches, what it
+   * resolves modules against, and what module ids in the React Client Manifest
+   * are keyed on. If it changes between runs — a lockfile appearing anywhere
+   * above the project will do it — ids computed under the old root no longer
+   * match the ones being requested, and the symptom is a manifest lookup
+   * failure naming modules that are perfectly valid.
+   *
+   * Carried over from the admin portal's config, which had already hit this.
+   */
+  turbopack: {
+    root: __dirname,
   },
 };
 

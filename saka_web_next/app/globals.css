@@ -185,3 +185,125 @@
     padding-inline: 20px;
   }
 }
+/* ===========================================================================
+ * Portal design tokens — /vendor and /admin
+ * ===========================================================================
+ *
+ * The vendor and admin portals were built as separate applications with the
+ * SAME token names and deliberately different values: teal for vendors, blue
+ * for staff, "so a vendor and a moderator looking at the same listing can
+ * answer 'which app am I in?' at a glance". Two global `@theme` blocks in one
+ * stylesheet cannot both win, so the shared names are declared once here and
+ * the values that actually differ are scoped to a class on each portal's
+ * layout.
+ *
+ * Two of these names also collide with the marketplace — `--color-muted` (a
+ * muted BACKGROUND on the storefront, muted INK in the portals) and
+ * `--font-sans` (Urbanist vs a system stack). Those are deliberately NOT
+ * redeclared in `@theme`: doing so would overwrite the storefront's values for
+ * every page. They are overridden only inside `.theme-vendor` / `.theme-admin`,
+ * where the utilities resolve `var(...)` against the nearest ancestor.
+ * ------------------------------------------------------------------------- */
+
+@theme {
+  --color-canvas: oklch(0.985 0.002 250);
+  --color-surface: oklch(1 0 0);
+  --color-line: oklch(0.922 0.005 250);
+  --color-line-strong: oklch(0.86 0.008 250);
+
+  --color-ink: oklch(0.22 0.02 255);
+  --color-ink-soft: oklch(0.45 0.015 255);
+  --color-ink-faint: oklch(0.62 0.012 255);
+
+  /* Placeholder values only — every portal sets its own below. Declared here
+     so Tailwind emits the bg-brand / text-brand-ink utilities at all. */
+  --color-brand: oklch(0.55 0.11 195);
+  --color-brand-soft: oklch(0.96 0.03 195);
+  --color-brand-ink: oklch(0.40 0.11 195);
+
+  /* Status colours. Each has a soft background for badges and a strong ink for
+     text, so a badge never relies on colour alone to be legible. */
+  --color-ok: oklch(0.56 0.13 155);
+  --color-ok-soft: oklch(0.96 0.03 155);
+  --color-warn: oklch(0.68 0.14 75);
+  --color-warn-soft: oklch(0.97 0.04 85);
+  --color-danger: oklch(0.55 0.19 25);
+  --color-danger-soft: oklch(0.96 0.03 25);
+  --color-info: oklch(0.58 0.11 230);
+  --color-info-soft: oklch(0.96 0.025 230);
+  --color-muted-soft: oklch(0.955 0.004 255);
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* The vendor brand: teal. Warmer and slightly higher-chroma than admin — this
+   is a tool business owners choose to open, not one staff are assigned to. */
+.theme-vendor {
+  --color-brand: oklch(0.55 0.11 195);
+  --color-brand-soft: oklch(0.96 0.03 195);
+  --color-brand-ink: oklch(0.40 0.11 195);
+
+  /* Collides with the marketplace — see the note above. */
+  --color-muted: oklch(0.62 0.012 255);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The admin brand: blue. */
+.theme-admin {
+  --color-brand: oklch(0.52 0.14 250);
+  --color-brand-soft: oklch(0.96 0.02 250);
+  --color-brand-ink: oklch(0.38 0.14 250);
+
+  --color-muted: oklch(0.62 0.012 255);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/*
+ * The portals' `@layer base` rules, moved off `html`/`body` and onto the theme
+ * class. As written they styled the document, which in a shared deployment
+ * would have restyled the storefront too.
+ */
+.theme-vendor,
+.theme-admin {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* Tabular numerals: a column of counts that shifts width as digits change
+     is genuinely harder to scan. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* A visible focus ring everywhere in the portals. These are keyboard-heavy
+   tools and the browser default is easy to lose against a light surface. */
+.theme-vendor :focus-visible,
+.theme-admin :focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@layer utilities {
+  /* Scoped: the marketplace has no `.card` rule today, and an unscoped one
+     here would silently become a global the storefront could pick up. */
+  .theme-vendor .card,
+  .theme-admin .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+  }
+
+  /* Respects a user's reduced-motion preference — an admin tool should not
+     animate at someone who has asked it not to. Left global: it is a user
+     preference, not a portal style. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
