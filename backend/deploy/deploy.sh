@@ -133,9 +133,15 @@ if $PHP artisan migrate:status | grep -q 'Pending'; then
 fi
 
 # A readiness probe that checks the dependencies, not just that PHP responds.
+#
+# The body is printed on failure, not discarded. This probe also reports
+# `reference_data`, which fails when the database is migrated but never seeded —
+# the state in which every endpoint answers 200 and no visitor can register.
+# "Readiness probe failed" with no detail is what made that hard to see.
 APP_URL=$(grep -E '^APP_URL=' .env | cut -d= -f2-)
-if ! curl -fsS --max-time 10 "${APP_URL}/api/v1/health/ready" >/dev/null; then
+READY_BODY=$(curl -fsS --max-time 10 "${APP_URL}/api/v1/health/ready" 2>&1) || {
+  printf '%s\n' "$READY_BODY" >&2
   fail "Readiness probe failed at ${APP_URL}/api/v1/health/ready"
-fi
+}
 
 log "Deployed successfully."

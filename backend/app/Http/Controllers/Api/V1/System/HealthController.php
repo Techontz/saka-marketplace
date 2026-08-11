@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -49,6 +50,27 @@ class HealthController extends Controller
             }),
             'redis' => $this->check(fn () => Redis::connection()->ping()),
             'queue' => $this->check(fn () => Redis::connection('default')->connect ?? true),
+
+            /*
+             * Reachable is not the same as usable.
+             *
+             * A migrated but unseeded database passes every check above and
+             * then fails every registration: AuthService assigns the `buyer`
+             * role to each new account, and with no roles that throws. This
+             * endpoint reported "ready" throughout, which is how a deployment
+             * where nobody could create an account looked healthy.
+             *
+             * Roles specifically, not a general "is it seeded" heuristic —
+             * they are the one row set the write path cannot run without.
+             */
+            'reference_data' => $this->check(
+                function (): void {
+                    if (! DB::table('roles')->exists()) {
+                        throw new RuntimeException('roles table is empty');
+                    }
+                },
+                hint: 'No roles — run `php artisan db:seed --force`.',
+            ),
         ];
 
         $healthy = ! in_array(false, array_column($checks, 'ok'), true);
@@ -62,8 +84,14 @@ class HealthController extends Controller
         ], $healthy ? Response::HTTP_OK : Response::HTTP_SERVICE_UNAVAILABLE);
     }
 
-    /** @return array{ok: bool, latency_ms: float, error: ?string} */
-    private function check(callable $probe): array
+    /**
+     * @param  string|null  $hint  A static, author-written remediation line.
+     *                             Never derived from the exception, which is
+     *                             why it is safe to return where the message
+     *                             is not.
+     * @return array{ok: bool, latency_ms: float, error: ?string, hint?: string}
+     */
+    private function check(callable $probe, ?string $hint = null): array
     {
         $start = microtime(true);
 
@@ -76,13 +104,14 @@ class HealthController extends Controller
                 'error' => null,
             ];
         } catch (Throwable $e) {
-            return [
+            return array_filter([
                 'ok' => false,
                 'latency_ms' => round((microtime(true) - $start) * 1000, 2),
                 // The class name only — an exception message can carry
                 // credentials or host names.
                 'error' => class_basename($e),
-            ];
+                'hint' => $hint,
+            ], static fn ($value) => $value !== null);
         }
     }
 }

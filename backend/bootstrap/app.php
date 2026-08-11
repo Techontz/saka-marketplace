@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -33,6 +34,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        /*
+         * Trusted proxies are configured in `config/trustedproxy.php`, NOT
+         * here. Laravel already puts its TrustProxies middleware at the front
+         * of the global stack and falls back to that config file, and this
+         * closure runs before the configuration bootstrapper — so a
+         * `$middleware->trustProxies(at: env(...))` here silently ignores
+         * anything set in `.env`. That was verified, not assumed.
+         */
+
         // Global, not api-only: an unmatched route never enters the `api`
         // group, and the error envelope promises a request_id on EVERY failure.
         $middleware->prepend(AssignRequestId::class);
@@ -143,6 +153,42 @@ return Application::configure(basePath: dirname(__DIR__))
             };
 
             return $render($request, $code);
+        });
+
+        /*
+         * The catch-all. MUST stay last — callbacks are tried in registration
+         * order, so anything above still wins.
+         *
+         * Without this, an exception nobody anticipated escapes to Laravel's
+         * own handler and the client receives a bare `{"message":"Server
+         * Error"}` — no code, no request_id. The envelope above promises a
+         * request_id on EVERY failure, and that promise was quietly false for
+         * exactly the failures where correlating a report to a log line matters
+         * most.
+         *
+         * This is not hypothetical: registration against an unseeded database
+         * threw Spatie's RoleDoesNotExist, which is neither an ApiException nor
+         * an HttpException. Every visitor saw the browser's generic fallback
+         * string and there was no identifier to trace it with.
+         *
+         * The exception message is NEVER sent when debug is off — it can carry
+         * table names, file paths and query fragments. Reporting is untouched,
+         * so the real exception is still logged in full against the same id.
+         */
+        $exceptions->render(function (Throwable $e, Request $request) use ($render) {
+            // Not ours to render: these carry a response of their own.
+            if ($e instanceof HttpResponseException) {
+                return null;
+            }
+
+            // Non-JSON callers keep Laravel's HTML error page.
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return null;
+            }
+
+            return $render($request, ErrorCode::ServerError, details: config('app.debug') === true
+                ? ['exception' => $e::class, 'message' => $e->getMessage()]
+                : []);
         });
     })
     ->create();
