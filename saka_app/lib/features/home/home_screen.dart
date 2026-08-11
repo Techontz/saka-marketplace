@@ -9,9 +9,11 @@ import '../../core/storage/cache_store.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/saka_logo.dart';
 import '../../data/models/category.dart';
+import '../../data/models/business.dart';
 import '../../data/models/listing.dart';
 import '../../data/repositories/ads_repository.dart';
 import '../../data/repositories/catalog_repository.dart';
+import '../../data/repositories/directory_repository.dart';
 import '../../data/repositories/listing_repository.dart';
 import '../auth/auth_controller.dart';
 import '../auth/sign_in_sheet.dart';
@@ -21,7 +23,9 @@ import '../location/location_sheet.dart';
 import '../search/search_screen.dart';
 import 'home_controller.dart';
 import 'widgets/ad_strip.dart';
+import 'widgets/business_rail.dart';
 import 'widgets/category_strip.dart';
+import 'widgets/hero_listing_card.dart';
 import 'widgets/listing_rail.dart';
 
 /// Home.
@@ -55,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen>
     _controller = Get.put(
       HomeController(
         catalog: Get.find<CatalogRepository>(),
+        directory: Get.find<DirectoryRepository>(),
         listings: Get.find<ListingRepository>(),
         ads: Get.find<AdsRepository>(),
         location: Get.find<LocationController>(),
@@ -129,6 +134,23 @@ class _HomeScreenState extends State<HomeScreen>
                       title: category.name,
                     ),
                   ),
+                );
+              }),
+            ),
+
+            // The editorial slot: the single strongest featured listing,
+            // full width. Sits above the rails so the feed opens with one
+            // photograph rather than a row of thumbnails.
+            SliverToBoxAdapter(
+              child: Obx(() {
+                final RailState state = _controller.featured.value;
+                final Listing? lead =
+                    state.items.isEmpty ? null : state.items.first;
+                if (lead == null) return const SizedBox.shrink();
+                return HeroListingCard(
+                  listing: lead,
+                  onTap: () => _openListing(lead, 'hero'),
+                  onAuthRequired: _requireAuth,
                 );
               }),
             ),
@@ -209,6 +231,22 @@ class _HomeScreenState extends State<HomeScreen>
                       title: 'Trending',
                     ),
                   ),
+                ),
+              ),
+            ),
+
+            // The directory. A different card shape on purpose — see
+            // BusinessRail. Hidden entirely when the API returns none.
+            SliverToBoxAdapter(
+              child: Obx(
+                () => BusinessRail(
+                  businesses: _controller.businesses.toList(growable: false),
+                  // Named routes, not Get.to: the detail screen reads its
+                  // slug from Get.parameters, and a deep link into it must
+                  // land on the same screen as a tap here.
+                  onTapBusiness: (Business business) =>
+                      Get.toNamed<void>(Routes.businessPath(business.slug)),
+                  onSeeAll: () => Get.toNamed<void>(Routes.businesses),
                 ),
               ),
             ),

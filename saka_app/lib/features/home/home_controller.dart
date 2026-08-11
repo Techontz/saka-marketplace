@@ -5,10 +5,13 @@ import 'package:get/get.dart';
 import '../../core/errors/api_exception.dart';
 import '../../core/storage/cache_store.dart';
 import '../../data/models/category.dart';
+import '../../data/models/business.dart';
 import '../../data/models/listing.dart';
+import '../../data/models/paginated.dart';
 import '../../data/models/misc.dart';
 import '../../data/repositories/ads_repository.dart';
 import '../../data/repositories/catalog_repository.dart';
+import '../../data/repositories/directory_repository.dart';
 import '../../data/repositories/listing_repository.dart';
 import '../location/location_controller.dart';
 
@@ -24,17 +27,20 @@ import '../location/location_controller.dart';
 class HomeController extends GetxController {
   HomeController({
     required CatalogRepository catalog,
+    required DirectoryRepository directory,
     required ListingRepository listings,
     required AdsRepository ads,
     required LocationController location,
     required CacheStore cache,
   })  : _catalog = catalog,
+        _directory = directory,
         _listings = listings,
         _ads = ads,
         _location = location,
         _cache = cache;
 
   final CatalogRepository _catalog;
+  final DirectoryRepository _directory;
   final ListingRepository _listings;
   final AdsRepository _ads;
   final LocationController _location;
@@ -45,6 +51,14 @@ class HomeController extends GetxController {
   final Rx<RailState> trending = RailState.idle().obs;
   final Rx<RailState> nearby = RailState.idle().obs;
   final RxList<AdCreative> ads = <AdCreative>[].obs;
+
+  /// Businesses for the home rail.
+  ///
+  /// A plain list rather than a RailState: this section renders nothing at all
+  /// when it is empty or still loading, so it has no skeleton and no error
+  /// state to model. The directory is a secondary surface — a spinner for it
+  /// above the fold would be noise.
+  final RxList<Business> businesses = <Business>[].obs;
 
   /// True only when there is genuinely nothing to show — no cache, first ever
   /// launch. This is the ONLY case that earns a skeleton screen.
@@ -108,10 +122,24 @@ class HomeController extends GetxController {
         _loadRail(ListingRailKind.trending, trending, CacheStore.kHomeTrending),
         _loadNearby(),
         _loadAds(),
+        _loadBusinesses(),
       ]);
     } finally {
       isRefreshing.value = false;
       isColdStart.value = false;
+    }
+  }
+
+  /// The directory's first page, verified businesses first.
+  ///
+  /// Failure is silent and leaves the list empty, which removes the section.
+  /// A home feed must not surface an error for a rail the user did not ask for.
+  Future<void> _loadBusinesses() async {
+    try {
+      final Paginated<Business> page = await _directory.businesses();
+      businesses.assignAll(page.items.take(10));
+    } on Object {
+      // Section stays hidden.
     }
   }
 
