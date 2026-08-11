@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { AdSlot } from "@/components/ads/AdSlot";
+import { HomeSearch } from "@/components/home/HomeSearch";
 import { BrowseByCategory } from "@/components/home/BrowseByCategory";
 import { Faq } from "@/components/home/Faq";
 import { ListingCard } from "@/components/listings/ListingCard";
@@ -59,6 +60,10 @@ export default async function HomePage() {
       <h1 className="sr-only">
         SAKA — property, vehicles, services and businesses across Tanzania
       </h1>
+
+      {/* Search first: it is the primary action on a marketplace and the
+          homepage had no entry point to it at any width. */}
+      <HomeSearch categories={categories.data} />
 
       <BrowseByCategory categories={categories.data} />
 
