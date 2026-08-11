@@ -15,6 +15,7 @@ import '../../data/models/listing.dart';
 import '../../data/repositories/catalog_repository.dart';
 import '../../data/repositories/listing_repository.dart';
 import '../auth/sign_in_sheet.dart';
+import '../map/map_discovery_screen.dart';
 import '../filters/filter_sheet.dart';
 import 'listings_controller.dart';
 
@@ -120,6 +121,19 @@ class _ListingsScreenState extends State<ListingsScreen> {
               ),
               tooltip: _controller.isGrid.value ? 'List view' : 'Grid view',
             ),
+          ),
+          // Map view of the SAME query. The map screen re-runs it with a
+          // larger page because markers are cheap and a sparse map reads as an
+          // empty country.
+          IconButton(
+            onPressed: () => Get.to<void>(
+              () => MapDiscoveryScreen(
+                initialQuery: _controller.query,
+                title: widget.title,
+              ),
+            ),
+            icon: const Icon(Icons.map_outlined, size: 21),
+            tooltip: 'Map view',
           ),
           const SizedBox(width: AppSpacing.xs),
         ],
