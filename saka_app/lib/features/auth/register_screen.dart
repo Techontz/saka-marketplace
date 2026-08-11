@@ -46,6 +46,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
+    // The button is disabled while busy, but the keyboard's "done" action on
+    // the last field calls this directly and never consults it. Registration
+    // is capped at 3 per hour per IP, so a second POST does not create a second
+    // account — it spends a third of the user's daily allowance and pushes them
+    // toward a 429 they cannot clear.
+    if (_busy) return;
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() {
       _busy = true;
@@ -184,7 +190,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             if (_error != null && _error!.fieldErrors.isEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
               Text(
-                _error!.message,
+                // On a 429 the API says "please slow down" without saying for
+                // how long, which reads as "try again now". Appending the wait
+                // it already sent in Retry-After is the difference between a
+                // user waiting and a user tapping until they are locked out.
+                switch (_error!.retryAfterLabel) {
+                  final String wait => '${_error!.message} Try again $wait.',
+                  null => _error!.message,
+                },
                 style: AppTypography.bodySmall.copyWith(
                   color: AppColors.destructive,
                   fontWeight: FontWeight.w600,

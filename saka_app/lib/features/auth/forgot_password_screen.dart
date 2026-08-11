@@ -35,6 +35,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    // See RegisterScreen: the keyboard's "done" action bypasses the disabled
+    // button. Password reset is 3 per hour per email — a duplicate submit sends
+    // the user a second email and burns a third of that budget.
+    if (_busy) return;
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() {
       _busy = true;

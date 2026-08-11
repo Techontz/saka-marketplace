@@ -1,3 +1,5 @@
+import 'dart:io' show HttpDate;
+
 import 'package:dio/dio.dart';
 
 /// Every failure this app can show a human.
@@ -36,6 +38,7 @@ class ApiException implements Exception {
     this.statusCode,
     this.requestId,
     this.fieldErrors = const <String, List<String>>{},
+    this.retryAfter,
   });
 
   final ApiErrorKind kind;
@@ -52,6 +55,29 @@ class ApiException implements Exception {
 
   /// 422 only, keyed by field name, for binding straight onto form inputs.
   final Map<String, List<String>> fieldErrors;
+
+  /// 429 only: how long the API said to wait, from its `Retry-After` header.
+  ///
+  /// Registration is capped at 3 per hour, so the wait is measured in tens of
+  /// minutes. "Please slow down" on its own invites the user to tap again
+  /// immediately, which is exactly the behaviour that put them here.
+  final Duration? retryAfter;
+
+  /// "in about 30 minutes" — for appending to a rate-limit message.
+  ///
+  /// Rounded up, and never says "in 0 minutes": under a minute reads as
+  /// "in a moment", which is both true and actionable.
+  String? get retryAfterLabel {
+    final Duration? wait = retryAfter;
+    if (wait == null || wait <= Duration.zero) return null;
+    if (wait.inMinutes < 1) return 'in a moment';
+    if (wait.inMinutes < 60) {
+      final int minutes = wait.inSeconds ~/ 60 + (wait.inSeconds % 60 > 0 ? 1 : 0);
+      return 'in about $minutes minute${minutes == 1 ? '' : 's'}';
+    }
+    final int hours = wait.inHours + (wait.inMinutes % 60 > 0 ? 1 : 0);
+    return 'in about $hours hour${hours == 1 ? '' : 's'}';
+  }
 
   bool get isAuthProblem => kind == ApiErrorKind.unauthorized;
   bool get isRetryable =>
@@ -176,7 +202,27 @@ class ApiException implements Exception {
       statusCode: status,
       requestId: requestId,
       fieldErrors: fields,
+      retryAfter: _retryAfterOf(response),
     );
+  }
+
+  /// Reads `Retry-After`, which RFC 9110 allows as either a delay in seconds or
+  /// an HTTP date. Laravel sends seconds; the date form is handled so a CDN or
+  /// WAF sitting in front of the API cannot make this silently return null.
+  static Duration? _retryAfterOf(Response<dynamic>? response) {
+    final String? raw = response?.headers.value('retry-after')?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final int? seconds = int.tryParse(raw);
+    if (seconds != null) return Duration(seconds: seconds);
+
+    try {
+      final Duration wait =
+          HttpDate.parse(raw).difference(DateTime.now().toUtc());
+      return wait.isNegative ? null : wait;
+    } on Object {
+      return null;
+    }
   }
 
   /// A 2xx we could not read. Separated from [ApiErrorKind.server] so it is
@@ -186,7 +232,8 @@ class ApiException implements Exception {
         message = 'Something went wrong loading this content.',
         statusCode = null,
         requestId = null,
-        fieldErrors = const <String, List<String>>{};
+        fieldErrors = const <String, List<String>>{},
+        retryAfter = null;
 
   static const String _unknownMessage = 'Something went wrong. Please try again.';
 

@@ -53,6 +53,10 @@ class _SignInSheetState extends State<SignInSheet> {
   }
 
   Future<void> _submit() async {
+    // See RegisterScreen: the keyboard's "done" action bypasses the disabled
+    // button. Login is throttled per email AND per IP, so a duplicate submit
+    // spends the user's own attempt budget.
+    if (_busy) return;
     if (!(_form.currentState?.validate() ?? false)) return;
 
     setState(() {
