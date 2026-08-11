@@ -11,6 +11,7 @@ import '../../core/widgets/saka_logo.dart';
 import '../../data/models/category.dart';
 import '../../data/models/business.dart';
 import '../../data/models/listing.dart';
+import '../../data/models/misc.dart';
 import '../../data/repositories/ads_repository.dart';
 import '../../data/repositories/catalog_repository.dart';
 import '../../data/repositories/directory_repository.dart';
@@ -27,6 +28,7 @@ import 'widgets/business_rail.dart';
 import 'widgets/category_strip.dart';
 import 'widgets/hero_listing_card.dart';
 import 'widgets/listing_rail.dart';
+import 'widgets/place_rail.dart';
 
 /// Home.
 ///
@@ -235,6 +237,46 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
 
+            SliverToBoxAdapter(
+              child: Obx(
+                () => ListingRail(
+                  title: 'Newly posted',
+                  subtitle: 'The most recent listings on SAKA',
+                  state: _controller.newest.value,
+                  railKey: 'newest',
+                  onTapListing: _openListing,
+                  onAuthRequired: _requireAuth,
+                  onSeeAll: () => Get.to<void>(
+                    () => const ListingsScreen(
+                      initialQuery: ListingQuery(sort: 'newest'),
+                      title: 'Newly posted',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Obx(
+                () => ListingRail(
+                  title: 'Specialists',
+                  subtitle: 'Book a professional near you',
+                  state: _controller.specialists.value,
+                  railKey: 'specialists',
+                  onTapListing: _openListing,
+                  onAuthRequired: _requireAuth,
+                  onSeeAll: () => Get.to<void>(
+                    () => const ListingsScreen(
+                      initialQuery: ListingQuery(
+                        categorySlug: DirectoryRepository.specialistsCategory,
+                      ),
+                      title: 'Specialists',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // The directory. A different card shape on purpose — see
             // BusinessRail. Hidden entirely when the API returns none.
             SliverToBoxAdapter(
@@ -247,6 +289,17 @@ class _HomeScreenState extends State<HomeScreen>
                   onTapBusiness: (Business business) =>
                       Get.toNamed<void>(Routes.businessPath(business.slug)),
                   onSeeAll: () => Get.toNamed<void>(Routes.businesses),
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Obx(
+                () => PlaceRail(
+                  places: _controller.places.toList(growable: false),
+                  onTapPlace: (PublicPlace place) =>
+                      Get.toNamed<void>(Routes.placePath(place.slug)),
+                  onSeeAll: () => Get.toNamed<void>(Routes.places),
                 ),
               ),
             ),

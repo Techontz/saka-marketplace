@@ -5,6 +5,7 @@ import { AdSlot } from "@/components/ads/AdSlot";
 import { CategoryRails } from "@/components/home/CategoryRails";
 import { DiscoveryRail, RailItem } from "@/components/home/DiscoveryRail";
 import { HomeSearch } from "@/components/home/HomeSearch";
+import { MapDiscovery } from "@/components/home/MapDiscovery";
 import { PlaceCard } from "@/components/home/PlaceCard";
 import { SellOnSaka } from "@/components/home/SellOnSaka";
 import { BusinessCard } from "@/components/businesses/BusinessCard";
@@ -235,6 +236,12 @@ export default async function HomePage() {
           </RailItem>
         ))}
       </DiscoveryRail>
+
+      {/*
+        The map, fed by listings this page already fetched — no extra request,
+        and only the ones the API gave real coordinates for.
+      */}
+      <MapDiscovery listings={[...newestViews, ...trendingViews, ...featuredViews]} />
 
       {/* A thin strip, between sections. Collapses to nothing when unsold. */}
       <div className="mx-auto w-full max-w-7xl px-6">

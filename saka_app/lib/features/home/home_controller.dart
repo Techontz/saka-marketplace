@@ -6,9 +6,9 @@ import '../../core/errors/api_exception.dart';
 import '../../core/storage/cache_store.dart';
 import '../../data/models/category.dart';
 import '../../data/models/business.dart';
+import '../../data/models/misc.dart';
 import '../../data/models/listing.dart';
 import '../../data/models/paginated.dart';
-import '../../data/models/misc.dart';
 import '../../data/repositories/ads_repository.dart';
 import '../../data/repositories/catalog_repository.dart';
 import '../../data/repositories/directory_repository.dart';
@@ -59,6 +59,16 @@ class HomeController extends GetxController {
   /// state to model. The directory is a secondary surface — a spinner for it
   /// above the fold would be noise.
   final RxList<Business> businesses = <Business>[].obs;
+
+  /// Newest listings, and the specialist vertical. Both are ordinary
+  /// `/listings` queries — there is no `/specialists` index endpoint, and
+  /// `sort=newest` is one of the seven values the API actually allows.
+  final Rx<RailState> newest = RailState.idle().obs;
+  final Rx<RailState> specialists = RailState.idle().obs;
+
+  /// Public places. Plain list, like businesses: the section disappears when
+  /// empty rather than showing a skeleton for a secondary surface.
+  final RxList<PublicPlace> places = <PublicPlace>[].obs;
 
   /// True only when there is genuinely nothing to show — no cache, first ever
   /// launch. This is the ONLY case that earns a skeleton screen.
@@ -123,6 +133,9 @@ class HomeController extends GetxController {
         _loadNearby(),
         _loadAds(),
         _loadBusinesses(),
+        _loadNewest(),
+        _loadSpecialists(),
+        _loadPlaces(),
       ]);
     } finally {
       isRefreshing.value = false;
@@ -138,6 +151,46 @@ class HomeController extends GetxController {
     try {
       final Paginated<Business> page = await _directory.businesses();
       businesses.assignAll(page.items.take(10));
+    } on Object {
+      // Section stays hidden.
+    }
+  }
+
+  /// The most recent listings across every vertical.
+  Future<void> _loadNewest() async {
+    await _loadQueryRail(
+      const ListingQuery(sort: 'newest'),
+      newest,
+    );
+  }
+
+  /// The specialist vertical, which is a CATEGORY rather than an endpoint.
+  Future<void> _loadSpecialists() async {
+    await _loadQueryRail(
+      const ListingQuery(
+        categorySlug: DirectoryRepository.specialistsCategory,
+        sort: 'newest',
+      ),
+      specialists,
+    );
+  }
+
+  /// Shared by the two query-backed rails above.
+  Future<void> _loadQueryRail(ListingQuery query, Rx<RailState> target) async {
+    if (target.value.items.isEmpty) target.value = RailState.loading();
+    try {
+      final List<Listing> items =
+          (await _listings.search(query, perPage: 10)).items;
+      target.value = RailState.loaded(items);
+    } on Object catch (error) {
+      target.value = RailState.failed(ApiException.from(error));
+    }
+  }
+
+  Future<void> _loadPlaces() async {
+    try {
+      final Paginated<PublicPlace> page = await _directory.places();
+      places.assignAll(page.items.take(10));
     } on Object {
       // Section stays hidden.
     }
