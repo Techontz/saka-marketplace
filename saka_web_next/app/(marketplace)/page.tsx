@@ -2,13 +2,27 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { AdSlot } from "@/components/ads/AdSlot";
+import { CategoryRails } from "@/components/home/CategoryRails";
+import { DiscoveryRail, RailItem } from "@/components/home/DiscoveryRail";
 import { HomeSearch } from "@/components/home/HomeSearch";
+import { PlaceCard } from "@/components/home/PlaceCard";
+import { SellOnSaka } from "@/components/home/SellOnSaka";
+import { BusinessCard } from "@/components/businesses/BusinessCard";
 import { BrowseByCategory } from "@/components/home/BrowseByCategory";
 import { Faq } from "@/components/home/Faq";
 import { ListingCard } from "@/components/listings/ListingCard";
 import { ListingCardHorizontal } from "@/components/listings/ListingCardHorizontal";
 import { RecentlyViewed } from "@/components/listings/RecentlyViewed";
-import { getCategories, getFaqs, getRecommended, getTrending } from "@/lib/api/public";
+import {
+  getBusinesses,
+  getCategories,
+  getFaqs,
+  getFeatured,
+  getListings,
+  getPlaces,
+  getRecommended,
+  getTrending,
+} from "@/lib/api/public";
 import { toListingView } from "@/lib/view-models";
 
 /**
@@ -39,14 +53,26 @@ export const revalidate = 0;
 export default async function HomePage() {
   // Parallel, and each failure is contained: a homepage that 500s because the
   // FAQ endpoint is down is a worse outcome than a homepage without an FAQ.
-  const [categories, recommended, trending, faqs] = await Promise.all([
-    getCategories().catch(() => ({ data: [] })),
-    getRecommended().catch(() => ({ data: [] })),
-    getTrending().catch(() => ({ data: [] })),
-    getFaqs().catch(() => ({ data: [] })),
-  ]);
+  const [categories, recommended, trending, faqs, featured, newest, businesses, specialists, places] =
+    await Promise.all([
+      getCategories().catch(() => ({ data: [] })),
+      getRecommended().catch(() => ({ data: [] })),
+      getTrending().catch(() => ({ data: [] })),
+      getFaqs().catch(() => ({ data: [] })),
+      getFeatured().catch(() => ({ data: [] })),
+      // `newest` is one of the seven values IndexListingRequest actually
+      // allows. `featured` and `popular` are not — they 422.
+      getListings({ per_page: 8, sort: "newest" }).catch(() => ({ data: [] })),
+      getBusinesses({ per_page: 8 }).catch(() => ({ data: [] })),
+      // There is no /specialists index. The vertical is a category.
+      getListings({ category: "specialists", per_page: 8, sort: "newest" }).catch(() => ({ data: [] })),
+      getPlaces({ per_page: 8 }).catch(() => ({ data: [] })),
+    ]);
 
   const recommendedViews = recommended.data.map(toListingView);
+  const featuredViews = featured.data.map(toListingView);
+  const newestViews = newest.data.map(toListingView);
+  const specialistViews = specialists.data.map(toListingView);
   const trendingViews = trending.data.map(toListingView);
 
   return (
@@ -144,6 +170,72 @@ export default async function HomePage() {
         </section>
       )}
 
+      <DiscoveryRail
+        title="Featured on SAKA"
+        subtitle="Hand-picked by the SAKA team"
+        href="/listings?featured=1"
+        tone="white"
+      >
+        {featuredViews.map((listing) => (
+          <RailItem key={listing.slug} width="wide">
+            <ListingCard p={listing} />
+          </RailItem>
+        ))}
+      </DiscoveryRail>
+
+      <DiscoveryRail
+        title="Newly posted"
+        subtitle="The most recent listings on SAKA"
+        href="/listings?sort=newest"
+      >
+        {newestViews.map((listing) => (
+          <RailItem key={listing.slug}>
+            <ListingCard p={listing} />
+          </RailItem>
+        ))}
+      </DiscoveryRail>
+
+      {/* Rails per vertical, chosen from the live taxonomy by listing_count. */}
+      <CategoryRails categories={categories.data} />
+
+      <DiscoveryRail
+        title="Businesses on SAKA"
+        subtitle="Verified shops, agents and service providers"
+        href="/businesses"
+        tone="white"
+      >
+        {businesses.data.map((business) => (
+          <RailItem key={business.slug} width="wide">
+            <BusinessCard business={business} />
+          </RailItem>
+        ))}
+      </DiscoveryRail>
+
+      <DiscoveryRail
+        title="Specialists"
+        subtitle="Book a professional near you"
+        href="/specialists"
+      >
+        {specialistViews.map((listing) => (
+          <RailItem key={listing.slug}>
+            <ListingCard p={listing} />
+          </RailItem>
+        ))}
+      </DiscoveryRail>
+
+      <DiscoveryRail
+        title="Places worth knowing"
+        subtitle="Landmarks, beaches and neighbourhoods across Tanzania"
+        href="/public-places"
+        tone="white"
+      >
+        {places.data.map((place) => (
+          <RailItem key={place.slug} width="narrow">
+            <PlaceCard place={place} />
+          </RailItem>
+        ))}
+      </DiscoveryRail>
+
       {/* A thin strip, between sections. Collapses to nothing when unsold. */}
       <div className="mx-auto w-full max-w-7xl px-6">
         <AdSlot placement="homepage_strip" className="pb-4" />
@@ -196,6 +288,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <SellOnSaka />
 
       <Faq faqs={faqs.data} />
     </>

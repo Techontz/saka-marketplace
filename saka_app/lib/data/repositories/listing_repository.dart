@@ -26,6 +26,7 @@ class ListingQuery {
     this.maxPrice,
     this.sort,
     this.verifiedOnly = false,
+    this.featuredOnly = false,
     this.latitude,
     this.longitude,
     this.radiusKm,
@@ -42,11 +43,18 @@ class ListingQuery {
   final int? minPrice;
   final int? maxPrice;
 
-  /// `newest` | `price_asc` | `price_desc` | `popular` — whatever the backend
-  /// accepts; passed straight through.
+  /// One of the values the API's IndexListingRequest actually allows:
+  /// `newest`, `oldest`, `price_asc`, `price_desc`, `popularity`, `distance`,
+  /// `relevance`. Anything else is a 422, not a silently ignored parameter —
+  /// this doc used to say `popular`, and two "See all" buttons sent it.
   final String? sort;
 
   final bool verifiedOnly;
+
+  /// Featured is a FILTER on the index, not a sort. There is no
+  /// `sort=featured`; the rail itself comes from `/listings/featured`, and
+  /// this is how its "see all" reaches the same set.
+  final bool featuredOnly;
   final double? latitude;
   final double? longitude;
   final double? radiusKm;
@@ -84,6 +92,7 @@ class ListingQuery {
       'max_price': maxPrice,
       'sort': sort,
       if (verifiedOnly) 'verified': 1,
+      if (featuredOnly) 'featured': 1,
       'lat': latitude,
       'lng': longitude,
       'radius': radiusKm,

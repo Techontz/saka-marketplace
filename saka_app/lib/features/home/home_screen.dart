@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen>
                   onAuthRequired: _requireAuth,
                   onSeeAll: () => Get.to<void>(
                     () => const ListingsScreen(
-                      initialQuery: ListingQuery(sort: 'featured'),
+                      initialQuery: ListingQuery(featuredOnly: true),
                       title: 'Featured',
                     ),
                   ),
@@ -227,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen>
                   onAuthRequired: _requireAuth,
                   onSeeAll: () => Get.to<void>(
                     () => const ListingsScreen(
-                      initialQuery: ListingQuery(sort: 'popular'),
+                      initialQuery: ListingQuery(sort: 'popularity'),
                       title: 'Trending',
                     ),
                   ),
