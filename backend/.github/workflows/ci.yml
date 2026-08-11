@@ -1,0 +1,288 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  # A new push to the same branch makes the in-flight run obsolete.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.3'
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Static gates. No database, no services — these fail in under a minute and
+  # give a developer the answer before the slow job has finished booting MySQL.
+  # --------------------------------------------------------------------------
+  static:
+    name: Lint & static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: bcmath, gd, intl, mbstring, pdo_mysql, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ env.PHP_VERSION }}-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Check composer.json / composer.lock are in sync
+        run: composer validate --strict --no-check-publish
+
+      - name: Pint (code style)
+        run: vendor/bin/pint --test
+
+      - name: PHPStan (level 6)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: Audit dependencies for known vulnerabilities
+        run: composer audit --no-interaction
+
+  # --------------------------------------------------------------------------
+  # Tests run against MySQL and Redis, not SQLite.
+  #
+  # The schema uses FULLTEXT indexes, CHECK constraints and generated columns —
+  # SQLite silently accepts or ignores all three, so a green SQLite suite would
+  # prove nothing about production. Redis is equally load-bearing: the counter
+  # buffer, the permission cache and the rate limiter all live there.
+  # --------------------------------------------------------------------------
+  tests:
+    name: Feature & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:9.3
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: saka_testing
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: bcmath, gd, intl, mbstring, pdo_mysql, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ env.PHP_VERSION }}-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot --silent && exit 0
+            sleep 2
+          done
+          echo "MySQL did not become ready" >&2
+          exit 1
+
+      - name: Run tests
+        run: php artisan test
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: saka_testing
+          DB_USERNAME: root
+          DB_PASSWORD: root
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+
+  # --------------------------------------------------------------------------
+  # Migrations must be reversible. A migration that only rolls forward is a
+  # deploy you cannot back out of at 2am, so `migrate:rollback` is verified
+  # here rather than discovered during an incident.
+  # --------------------------------------------------------------------------
+  migrations:
+    name: Migration up / rollback / re-up
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mysql:
+        image: mysql:9.3
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: saka_migrations
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: saka_migrations
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: bcmath, gd, intl, mbstring, pdo_mysql, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate
+        run: php artisan migrate --force
+
+      - name: Seed (proves the seeders survive a real schema)
+        run: php artisan db:seed --force
+
+      - name: Roll everything back
+        run: php artisan migrate:rollback --step=1000 --force
+
+      - name: Migrate again from empty
+        run: php artisan migrate --force
+
+      - name: Assert no pending migrations
+        run: |
+          if php artisan migrate:status | grep -q "Pending"; then
+            echo "Pending migrations after a full migrate — the runner is not idempotent." >&2
+            php artisan migrate:status
+            exit 1
+          fi
+
+  # --------------------------------------------------------------------------
+  # The spec is generated from the live route table, so this job is really
+  # asking: does the committed spec still describe the code on this branch?
+  # --------------------------------------------------------------------------
+  openapi:
+    name: OpenAPI spec is complete and in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: bcmath, gd, intl, mbstring, pdo_mysql, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Booting the app is enough to build the route table; no database needed.
+      - name: Validate spec
+        run: php docs/validate-openapi.php
+
+      - name: Fail if the spec is dirty
+        run: |
+          if [ -n "$(git status --porcelain docs/)" ]; then
+            echo "docs/ changed after regeneration — commit the regenerated spec." >&2
+            git --no-pager diff --stat docs/
+            exit 1
+          fi
+
+      - name: Publish spec as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: |
+            docs/openapi.json
+            docs/openapi.yaml
+          retention-days: 30
+
+  # --------------------------------------------------------------------------
+  # A single required check for branch protection, so adding a job later does
+  # not mean re-editing the protection rules.
+  # --------------------------------------------------------------------------
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [static, tests, migrations, openapi]
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        run: |
+          echo "static=${{ needs.static.result }}"
+          echo "tests=${{ needs.tests.result }}"
+          echo "migrations=${{ needs.migrations.result }}"
+          echo "openapi=${{ needs.openapi.result }}"
+          [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false" ]

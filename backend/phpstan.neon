@@ -1,0 +1,37 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - database
+        - routes
+
+    # Level 6 is the pragmatic ceiling for a Laravel app without annotating
+    # every facade and magic property. It already catches the failures that
+    # matter: undefined methods, wrong argument types, impossible conditions,
+    # unreachable code. Raising it further mostly produces noise about
+    # Eloquent's dynamic surface.
+    level: 6
+
+    checkModelProperties: true
+
+    # larastan and ide-helper annotate optimistically: Request::user() is typed
+    # non-null even on guest routes, and HasOne relations are typed non-nullable.
+    # Trusting those docblocks as *certain* would flag every legitimate null
+    # guard as dead code, so treat them as hints rather than facts. Native PHP
+    # types are still enforced.
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # Eloquent's builder chain is dynamically typed; asserting the concrete
+        # return of every scope would mean annotating the whole ORM.
+        - identifier: missingType.generics
+
+        # larastan resolves `$model->hasOneRelation` and `$request->user()` to
+        # the related class with no null branch. Both are null in practice —
+        # verified: a User with no seller profile returns null for
+        # ->sellerProfile, and Request::user() is null on every guest request.
+        # Dropping these `?->` guards would turn a null read into a fatal, so
+        # the guard stays and the (wrong) "unnecessary" report is ignored.
+        - identifier: nullsafe.neverNull

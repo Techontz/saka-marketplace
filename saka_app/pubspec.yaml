@@ -1,0 +1,83 @@
+name: saka_app
+description: "SAKA Marketplace — the mobile companion to saka.africa."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- state, routing, DI -----------------------------------------------
+  # GetX supplies all three. Controllers are registered per-feature with
+  # Bindings so a screen's controller is created on navigation and disposed
+  # on pop, rather than living for the life of the process.
+  get: ^4.7.2
+
+  # --- network ------------------------------------------------------------
+  dio: ^5.7.0
+  # Cancellation for obsolete search requests rides on Dio's CancelToken;
+  # connectivity drives the offline banner and the "retry when back" path.
+  connectivity_plus: ^6.1.0
+
+  # --- storage ------------------------------------------------------------
+  # Tokens ONLY. Keychain on iOS, EncryptedSharedPreferences on Android.
+  flutter_secure_storage: ^9.2.2
+  # Non-sensitive cache: categories, home payload, recent searches. Hive is a
+  # pure-Dart box store — no platform channel on the read path, so a cold start
+  # can paint from cache before the first frame budget is spent.
+  hive_ce: ^2.11.3
+  hive_ce_flutter: ^2.3.1
+
+  # --- images -------------------------------------------------------------
+  # Disk + memory cache, fade-in, and — critically — memCacheWidth so a 1200px
+  # photo is decoded at the size it is drawn rather than at full resolution.
+  cached_network_image: ^3.4.1
+
+  # --- maps ---------------------------------------------------------------
+  # Raster tiles from the SAME hosts the web uses (OpenStreetMap, Esri World
+  # Imagery, OpenTopoMap) — no API key, no vendor lock-in, and the land
+  # boundary a vendor draws on their phone sits on the same imagery they see on
+  # saka.africa. A Google Maps SDK would need a billed key and would render the
+  # parcel over different basemap data.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # --- ui -----------------------------------------------------------------
+  shimmer: ^3.0.0
+  url_launcher: ^6.3.1
+  share_plus: ^10.1.2
+  image_picker: ^1.1.2
+  flutter_svg: ^2.0.16
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  hive_ce_generator: ^1.9.2
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+  fonts:
+    # Urbanist is the web's display face (globals.css --font-display).
+    # Bundled rather than fetched so the first paint is never blocked on a
+    # font request over a slow Tanzanian mobile connection.
+    - family: Urbanist
+      fonts:
+        - asset: assets/fonts/Urbanist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Urbanist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Urbanist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Urbanist-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Urbanist-ExtraBold.ttf
+          weight: 800

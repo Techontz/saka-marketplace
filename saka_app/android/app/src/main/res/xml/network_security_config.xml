@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Development only.
+
+  The SAKA API is reached over https in production; this file exists so a debug
+  build can talk to `php artisan serve` on a laptop over the local network.
+  It is referenced from the DEBUG manifest alone, so a release APK still has
+  cleartext traffic blocked outright.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">192.168.0.157</domain>
+    </domain-config>
+</network-security-config>

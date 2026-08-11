@@ -1,0 +1,129 @@
+# ============================================================
+# SAKA MARKETPLACE MONOREPO
+# ============================================================
+
+# ------------------------------------------------------------
+# Environment / secrets
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+*.pem
+*.key
+*.p12
+*.mobileprovision
+key.properties
+google-services.json
+GoogleService-Info.plist
+
+# ------------------------------------------------------------
+# Node / Next.js
+# ------------------------------------------------------------
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+.vercel/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------
+# Laravel / PHP
+# ------------------------------------------------------------
+backend/vendor/
+
+backend/storage/*.key
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/testing/*
+backend/storage/framework/views/*
+backend/storage/app/public/*
+backend/storage/app/private/*
+
+.phpunit.result.cache
+
+# ------------------------------------------------------------
+# Laravel generated files
+# ------------------------------------------------------------
+bootstrap/cache/*.php
+
+# ------------------------------------------------------------
+# Flutter / Dart
+# ------------------------------------------------------------
+saka_app/.dart_tool/
+saka_app/.packages
+saka_app/.flutter-plugins
+saka_app/.flutter-plugins-dependencies
+saka_app/.pub-cache/
+saka_app/build/
+saka_app/.idea/
+saka_app/android/.gradle/
+saka_app/android/app/debug/
+saka_app/android/app/profile/
+saka_app/android/app/release/
+saka_app/ios/Pods/
+saka_app/ios/.symlinks/
+saka_app/ios/Flutter/ephemeral/
+saka_app/macos/Pods/
+saka_app/linux/flutter/ephemeral/
+saka_app/windows/flutter/ephemeral/
+
+# Flutter generated files
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# ------------------------------------------------------------
+# IDE
+# ------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ------------------------------------------------------------
+# macOS
+# ------------------------------------------------------------
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# ------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------
+*.log
+
+# ------------------------------------------------------------
+# Temporary files
+# ------------------------------------------------------------
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# ------------------------------------------------------------
+# Archives / local deployment artifacts
+# ------------------------------------------------------------
+backend.zip
+
+# ------------------------------------------------------------
+# Coverage
+# ------------------------------------------------------------
+coverage/
+htmlcov/
+
+# ------------------------------------------------------------
+# OS / tooling
+# ------------------------------------------------------------
+Thumbs.db
