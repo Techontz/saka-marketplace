@@ -510,16 +510,30 @@ class _ContactBar extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
+          // Flex left at the default: widening this column narrowed the button
+          // enough to wrap "Contact seller" onto two lines. The FittedBox below
+          // is what keeps the price whole, so the extra width was not needed.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text(
-                  Fmt.price(listing.price),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.price.copyWith(fontSize: 18),
+                // Scaled down, never ellipsised.
+                //
+                // This read "TZS 118,..." on a real 360pt phone: the price
+                // column had flex 1 against the button's 2, which left it
+                // about 87pt for a nine-figure number and a "/ month" unit.
+                // The price is the one string on this bar that must survive
+                // intact — a buyer cannot act on a truncated one, and cutting
+                // the digits is worse than cutting the type size.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    Fmt.price(listing.price),
+                    maxLines: 1,
+                    style: AppTypography.price.copyWith(fontSize: 18),
+                  ),
                 ),
                 if (listing.price.isNegotiable)
                   Text('Negotiable', style: AppTypography.caption),

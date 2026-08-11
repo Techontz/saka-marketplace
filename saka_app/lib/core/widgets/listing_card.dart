@@ -353,7 +353,9 @@ class _Cover extends StatelessWidget {
           ),
         // Bounded so the badges cannot run under the favourite button. The
         // purpose badge is the one that must always be legible, so VERIFIED is
-        // the one that yields — clipping it mid-word looked broken.
+        // the one that yields — scaled down, not clipped. It was clipped, and
+        // on a two-up grid it rendered as "VERIFIE", which reads as a broken
+        // layout rather than a shortened label.
         Positioned(
           top: AppSpacing.sm,
           left: AppSpacing.sm,
@@ -365,7 +367,9 @@ class _Cover extends StatelessWidget {
               if (listing.isVerified) ...<Widget>[
                 const SizedBox(width: AppSpacing.xs),
                 Flexible(
-                  child: ClipRect(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
                     child: VerifiedBadge(compact: compact),
                   ),
                 ),
