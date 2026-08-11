@@ -124,20 +124,45 @@ export function getListingReviews(slug: string): Promise<Paginated<ApiReview>> {
   return publicGet<Paginated<ApiReview>>(`/listings/${slug}/reviews`, { per_page: 10 }, SHORT);
 }
 
+/**
+ * A cached discovery rail that refuses to serve a cached EMPTY result.
+ *
+ * This is the fix for a homepage that rendered three sections instead of six.
+ * Next's data cache lives in `.next/cache` and SURVIVES A REBUILD, so when the
+ * API briefly returned `{"data":[]}` — the window before production's own cache
+ * was cleared — that emptiness was written to disk and kept being served. A
+ * redeploy did not shift it, and `revalidate` only refreshes after the window
+ * expires and only on a request that happens to land after it.
+ *
+ * An empty rail is almost never a durable truth on a marketplace with stock. So
+ * a cached empty is treated as a cache miss and re-fetched once, uncached. The
+ * extra request happens ONLY in the broken case; a genuinely empty rail costs
+ * one uncached round trip and still renders nothing, which is correct.
+ */
+async function railGet<T extends { data: unknown[] }>(
+  path: string,
+  query: Record<string, QueryValue | QueryValue[]>,
+): Promise<T> {
+  const cached = await publicGet<T>(path, query, RAIL);
+  if (cached.data.length > 0) return cached;
+
+  return publicGet<T>(path, query, LIVE);
+}
+
 export function getTrending(): Promise<{ data: ApiListing[] }> {
   // Class B — homepage rail, recomputed on a schedule rather than per write.
-  return publicGet<{ data: ApiListing[] }>("/listings/trending", { limit: 8 }, RAIL);
+  return railGet<{ data: ApiListing[] }>("/listings/trending", { limit: 8 });
 }
 
 export function getFeatured(): Promise<{ data: ApiListing[] }> {
   // Class B — homepage rail.
-  return publicGet<{ data: ApiListing[] }>("/listings/featured", { limit: 8 }, RAIL);
+  return railGet<{ data: ApiListing[] }>("/listings/featured", { limit: 8 });
 }
 
 export function getRecommended(): Promise<{ data: ApiListing[] }> {
   // Personalised for a signed-in caller; on the server there is no token, so
   // this is the popular fallback the API documents.
-  return publicGet<{ data: ApiListing[] }>("/listings/recommended", { limit: 4 }, RAIL);
+  return railGet<{ data: ApiListing[] }>("/listings/recommended", { limit: 4 });
 }
 
 /**
